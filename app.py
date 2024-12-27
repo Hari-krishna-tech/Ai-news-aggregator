@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import os
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -22,6 +23,17 @@ app = Flask(__name__)
 
 # Set your Gemini API key
 GEMINI_API_KEY = "your_gemini_api_key"
+
+def create_json_from_ai_response(ai_response):
+    """
+    Create a JSON object from the AI response.
+    """
+    ai_response = ai_response.strip("```json\n").strip("```")
+    try:
+        response = json.loads(ai_response)
+        return response
+    except Exception as e:
+        return {"error": f"Error parsing AI response: {str(e)}"}
 
 def perform_web_search(query, num_results=10):
     """
@@ -65,8 +77,9 @@ def generate_overall_summary_with_gemini(term_results):
         data += "\n"
 
     try:
-        prompt = f"Summarize the following content and provide a detailed summary in 1000 words: (just summary with point don't need to give pretext only list of summaries ) formate it in xml\n\n{data}"
+        prompt = f"Summarize the following content and provide a detailed summary in 1000 words: (just summary with point don't need to give pretext only list of summaries ) formate it in json should not have any new line in it just json(details and headline only)\n\n{data}"
         response = llm.invoke(prompt)
+
         return response.content.strip()
     except Exception as e:
         print(f"Error generating summary with Gemini: {e}")
@@ -80,6 +93,7 @@ def create_use_full_search_term(term):
         prompt = f"Give list the search terms we can use in google the following term to find the most recent news(trending news) give result in the form of search term,search term,search term and nothing else give atleast 5:\n\n{term}"
         response = llm.invoke(prompt)
         terms = response.content.strip().split(",")
+        print(term ,terms)
         return terms
     except Exception as e:
         print(f"Error generating summary with Gemini: {e}")
@@ -125,7 +139,11 @@ def search_and_summarize():
                         
                     })
             termSummary = generate_overall_summary_with_gemini(term_results)	
-            results.append({"search_term": term, "results": termSummary})
+            """
+            
+            """
+            # convert termsummary to json format
+            results.append({"search_term": term, "results": create_json_from_ai_response(termSummary)})
         return jsonify(results)
 
     except Exception as e:
