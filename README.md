@@ -32,8 +32,8 @@ This project is a Flask-based web service that performs the following tasks:
 
 ### **1. Clone the Repository**
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/Hari-krishna-tech/Ai-news-aggregator.git
+cd Ai-news-aggregator
 ```
 
 ### **2. Create a Virtual Environment**
