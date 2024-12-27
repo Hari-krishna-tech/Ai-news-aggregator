@@ -11,7 +11,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 llm = ChatGoogleGenerativeAI(
-    model='gemini-pro',  # Choose the appropriate model
+    model='gemini-1.5-flash',  # Choose the appropriate model
     temperature=0.7,     # Adjust creativity level as needed
     api_key=GEMINI_API_KEY
 )
@@ -49,20 +49,38 @@ def scrape_website_content(url):
         # Extract main body content
         paragraphs = soup.find_all('p')
         body_content = " ".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
-        body_content = body_content[:2000]  # Limit to first 2000 characters for readability
+        body_content = body_content  # Limit to first 2000 characters for readability
 
         return title, body_content
     except Exception as e:
         return "Error", f"Error scraping {url}: {str(e)}"
 
-def generate_summary_with_gemini(content):
+def generate_overall_summary_with_gemini(term_results):
+    """
+    Use the Gemini model via LangChain to generate a summary of the given content.
+    """
+    data = ""
+    for d in term_results:
+        data += d["body"]
+        data += "\n"
+
+    try:
+        prompt = f"Summarize the following content and provide a detailed summary in 1000 words: (just summary with point don't need to give pretext only list of summaries ) formate it in xml\n\n{data}"
+        response = llm.invoke(prompt)
+        return response.content.strip()
+    except Exception as e:
+        print(f"Error generating summary with Gemini: {e}")
+        return "Error generating summary"
+
+def create_use_full_search_term(term):
     """
     Use the Gemini model via LangChain to generate a summary of the given content.
     """
     try:
-        prompt = f"Summarize the following content:\n\n{content}"
+        prompt = f"Give list the search terms we can use in google the following term to find the most recent news(trending news) give result in the form of search term,search term,search term and nothing else give atleast 5:\n\n{term}"
         response = llm.invoke(prompt)
-        return response.content.strip()
+        terms = response.content.strip().split(",")
+        return terms
     except Exception as e:
         print(f"Error generating summary with Gemini: {e}")
         return "Error generating summary"
@@ -85,7 +103,12 @@ def search_and_summarize():
         results = []
 
         for term in search_terms:
-            websites = perform_web_search(term, num_results=num_results)
+            # Perform a web search
+            terms = create_use_full_search_term(term)
+            websites = []
+            for llm_term in terms:
+                
+                websites += perform_web_search(llm_term, num_results=2)
             term_results = []
 
             if isinstance(websites, dict) and "error" in websites:
@@ -94,24 +117,19 @@ def search_and_summarize():
                 for website in websites:
                     title, body_content = scrape_website_content(website)
 
-                    if body_content != "Error":
-                        summary = generate_summary_with_gemini(body_content)
-                    else:
-                        summary = "Error"
 
                     term_results.append({
                         "url": website,
                         "title": title,
-                        "body_content": body_content,
-                        "summary": summary
+						"body":body_content, 
+                        
                     })
-
-            results.append({"search_term": term, "results": term_results})
-
+            termSummary = generate_overall_summary_with_gemini(term_results)	
+            results.append({"search_term": term, "results": termSummary})
         return jsonify(results)
 
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=6000)
